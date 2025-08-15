@@ -86,6 +86,19 @@ python manage.py runserver
 3. Query the document
   Send a POST request to ```http://127.0.0.1:8000/api/query_pdf/``` with your question.
 
+Example 1 — Asked about the main character
+
+<img src="images/test2.png" width="500" />
+
+Example 2 — Asked a follow-up about the character’s sibling
+
+<img src="images/test3.png" width="500" />
+
+Example 3 — Asked a random  question
+
+<img src="images/test1.png" width="500" />
+
+This RAG system includes a relevance check to ensure that answers are based only on the provided documents.This prevents hallucinations (made-up answers) and ensures that users can trust the output when it does provide an answer.
 
 
 
