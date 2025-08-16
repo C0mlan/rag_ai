@@ -13,12 +13,14 @@ def process_pdf_upload(pdf_file):
         os.remove(old_file_path)
 
     file_path = default_storage.save(pdf_file.name, pdf_file)
-    cache.set("last_uploaded_pdf", file_path)
+    # cache.set("last_uploaded_pdf", file_path)
 
-   
+   # Load PDF and extract text
     loader = PyPDFLoader(file_path)
     docs = loader.load()
 
+
+    # Split text into chunks for embedding
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=200
@@ -28,5 +30,7 @@ def process_pdf_upload(pdf_file):
 
     embeddings = HuggingFaceEmbeddings()
     vector_store = FAISS.from_documents(chunks, embeddings)
+    # Cache the vector store (valid for 30 minutes)
+    cache.set("pdf_vector_store", vector_store,  timeout=1800)
 
     return vector_store.as_retriever()

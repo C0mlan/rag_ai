@@ -4,5 +4,6 @@ from . import views
 
 urlpatterns =[
    
-    path('pdf/', views.PDFChatAPIView, name = 'upload_pdf'),
+    path('upload_pdf/', views.PDFChatAPIView, name = 'upload_pdf'),
+    path('query_pdf/', views.query_pdf, name = 'query_pdf'),
 ]
