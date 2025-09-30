@@ -1,36 +1,84 @@
 import os
-from django.core.files.storage import default_storage
-from django.core.cache import cache
-from langchain_community.document_loaders import PyPDFLoader
+import chromadb
+from google import genai
+from django.core.files.storage import FileSystemStorage
+from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
 
-def process_pdf_upload(pdf_file):
- 
-    old_file_path = cache.get("last_uploaded_pdf")
-    if old_file_path and os.path.exists(old_file_path):
-        os.remove(old_file_path)
+# load_dotenv()
+client = genai.Client(api_key= os.environ.get('google_api_key'))
+DATA_PATH = r'./data'
+CHROMA_PATH = r"./chroma_db1"
 
-    file_path = default_storage.save(pdf_file.name, pdf_file)
-    # cache.set("last_uploaded_pdf", file_path)
 
-   # Load PDF and extract text
-    loader = PyPDFLoader(file_path)
+def load_pdf():
+    '''STEP 1: Load pdf from directory
+    '''
+    loader = PyPDFDirectoryLoader(DATA_PATH)
     docs = loader.load()
+    return docs
 
+def process_pdf_upload(docs):
+    '''STEP 2: Process PDF documents for RAG pipeline
 
-    # Split text into chunks for embedding
+    '''
+    documents =[]
+    metadata = []
+    ids = []
+    embedding = []
+    i = 0
+    #splitter to break documents into chunks
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200
+    chunk_size=1000,    
+    chunk_overlap=100   
     )
     chunks = text_splitter.split_documents(docs)
 
+    for chunk in chunks:
+        ids.append("ID"+ str(i))
+        documents.append(chunk.page_content)
+        metadata.append(chunk.metadata)
+        i += 1
+        
+        emb = embedding_pdf(chunk)
+        embedding.append(emb)
+        chroma_db(ids, documents, metadata, embedding)
+    
+    return  ids, documents, metadata, embedding
 
-    embeddings = HuggingFaceEmbeddings()
-    vector_store = FAISS.from_documents(chunks, embeddings)
-    # Cache the vector store (valid for 30 minutes)
-    cache.set("pdf_vector_store", vector_store,  timeout=1800)
 
-    return vector_store.as_retriever()
+def embedding_pdf(chunk):
+     """Generates an embedding for a text chunk using the Gemini model."""
+    result = client.models.embed_content(
+            model="gemini-embedding-001",
+            contents=chunk.page_content
+        )
+    emb = result.embeddings[0].values
+    # print(emb)
+    return emb          
+                
+def chroma_db(ids, documents, metadata, embedding):
+     """Adds the provided data to Chromadb"""
+    chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
+    collection = chroma_client.get_or_create_collection(name="words")
+    
+    collection.add(
+        ids=ids,
+        documents=documents,
+        metadatas=metadata,
+        embeddings=embedding
+    )
+    return collection
+
+# collection.upsert(
+#     documents= documents,
+#     metadatas = metadata,
+#     ids = ids
+# )
+def init():
+    docs = load_pdf()
+    process = process_pdf_upload(docs)
+    
+    
+    return process
+# init()
