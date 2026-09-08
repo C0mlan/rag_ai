@@ -1,0 +1,61 @@
+name: doc_rag
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    volumes:
+      - ..:/code
+    ports:
+      - "8001:8000"
+    env_file:
+      - ../.env
+    depends_on:
+      - db
+      - redis
+    command: python manage.py runserver 0.0.0.0:8000
+
+  db:
+    image: postgres:15
+    container_name: rag_postgres
+    environment:
+      POSTGRES_DB: rag_db
+      POSTGRES_USER: rag_user
+      POSTGRES_PASSWORD: rag_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: rag_redis
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: rag_celery
+    volumes:
+      - ..:/code
+    env_file:
+      - ../.env
+    environment:
+      PYTHONPATH: /code
+      RUN_MIGRATIONS: "false"
+    # restart: unless-stopped
+    depends_on:
+      - db
+      - redis
+    command: celery -A config.celery:app worker -l info
+
+
+volumes:
+  postgres_data:
+  redis_data:
